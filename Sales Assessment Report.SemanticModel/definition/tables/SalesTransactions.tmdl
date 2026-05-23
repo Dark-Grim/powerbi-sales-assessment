@@ -1,0 +1,209 @@
+table SalesTransactions
+	lineageTag: 9cf3b60d-e229-4e7c-bace-43c771af475c
+
+	/// Total revenue before discount = QuantitySold x Price
+	measure 'Gross Sales' = SUMX(SalesTransactions, SalesTransactions[QuantitySold] * RELATED(Products[Price]))
+		formatString: #,##0.00
+		displayFolder: Sales Metrics
+		lineageTag: cefa9cf6-afb8-4713-9cac-c221fd8b1c87
+
+	/// Total discount given = QuantitySold x Price x DiscountPct%
+	measure 'Total Discount Amount' = SUMX(SalesTransactions, SalesTransactions[QuantitySold] * RELATED(Products[Price]) * SalesTransactions[DiscountPct] / 100)
+		formatString: #,##0.00
+		displayFolder: Sales Metrics
+		lineageTag: b1283b09-d4d0-4f00-bf5c-0bd41c2f5678
+
+	/// Total revenue after discount = QuantitySold x Price x (1 - DiscountPct%)
+	measure 'Net Sales' = SUMX(SalesTransactions, SalesTransactions[QuantitySold] * RELATED(Products[Price]) * (1 - SalesTransactions[DiscountPct] / 100))
+		formatString: #,##0.00
+		displayFolder: Sales Metrics
+		lineageTag: 5defcadd-0857-4796-b889-ce3b97c52be4
+
+	/// Total units sold
+	measure 'Total Quantity Sold' = SUM(SalesTransactions[QuantitySold])
+		formatString: #,##0
+		displayFolder: Sales Metrics
+		lineageTag: 497c31e1-3b3a-4c05-ad33-31d0e3ec9d7a
+
+	/// Average discount percentage across all transactions
+	measure 'Avg Discount %' = AVERAGE(SalesTransactions[DiscountPct])
+		formatString: 0.00%
+		displayFolder: Sales Metrics
+		lineageTag: 74823ce1-3f06-40d7-bf8c-17b6ff892e50
+
+	/// Total Sales = Gross Sales (QuantitySold x Price before discount) - primary sales metric for reports
+	measure 'Total Sales' = SUMX(SalesTransactions, SalesTransactions[QuantitySold] * RELATED(Products[Price]))
+		formatString: #,##0.00
+		displayFolder: Sales Metrics
+		lineageTag: 512f374d-2902-415a-9b58-8dc94f5564a9
+
+	column RowID
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: int
+		lineageTag: 251faaf8-fcfb-4328-b702-742051199c4b
+		summarizeBy: count
+		sourceColumn: RowID
+
+		annotation SummarizationSetBy = Automatic
+
+	column TransactionID
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: int
+		lineageTag: fce4fbdf-d113-423b-9448-1b3abed803ec
+		summarizeBy: count
+		sourceColumn: TransactionID
+
+		annotation SummarizationSetBy = Automatic
+
+	column SaleDate
+		dataType: dateTime
+		isNullable: false
+		formatString: Long Date
+		sourceProviderType: date
+		lineageTag: 30f943a2-c3ef-4432-8ee8-375aa7aa53fb
+		summarizeBy: none
+		sourceColumn: SaleDate
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductID
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: int
+		lineageTag: 6649ee07-c397-4c77-8fe8-9a2b098953f5
+		summarizeBy: none
+		sourceColumn: ProductID
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductCategory
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(20)
+		lineageTag: 5bddafe1-01d9-494a-8bae-bdb3ba6d6fc6
+		summarizeBy: none
+		sourceColumn: ProductCategory
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(10)
+		lineageTag: 79267e35-5a88-49d4-b674-2b4a38b414c5
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = Automatic
+
+	column SalesChannel
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(10)
+		lineageTag: 306d827d-7721-4159-bc1b-e8f85b99dd97
+		summarizeBy: none
+		sourceColumn: SalesChannel
+
+		annotation SummarizationSetBy = Automatic
+
+	column SalespersonID
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(10)
+		lineageTag: edd1249a-4d03-4a7b-bf97-8ed7c0e08d80
+		summarizeBy: none
+		sourceColumn: SalespersonID
+
+		annotation SummarizationSetBy = Automatic
+
+	column QuantitySold
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: int
+		lineageTag: 1bcf4c7c-4fbb-41c7-a4f9-17e18f379803
+		summarizeBy: sum
+		sourceColumn: QuantitySold
+
+		annotation SummarizationSetBy = Automatic
+
+	column DiscountPct
+		dataType: double
+		isNullable: false
+		sourceProviderType: decimal(5, 2)
+		lineageTag: 762cadbf-8d2b-480c-80c4-cf9df8f2f45a
+		summarizeBy: sum
+		sourceColumn: DiscountPct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition SalesTransactions = m
+		mode: directQuery
+		source =
+				let
+				    Source = Sql.Database(ServerName, DatabaseName, [
+				        Query = "
+				            SELECT
+				                ST.RowID,
+				                ST.TransactionID,
+				                CAST(ST.SaleDate AS DATE)                  AS SaleDate,
+				                ST.ProductID,
+				                CASE
+				                    WHEN ST.ProductCategory IS NULL
+				                      OR TRIM(ST.ProductCategory) = ''
+				                      OR UPPER(TRIM(ST.ProductCategory)) = 'UNKNOWN'
+				                    THEN COALESCE(
+				                            (SELECT TOP 1 TRIM(P.Category)
+				                             FROM dbo.Products P
+				                             WHERE P.ProductID = ST.ProductID),
+				                            'Uncategorized'
+				                         )
+				                    ELSE TRIM(ST.ProductCategory)
+				                END                                        AS ProductCategory,
+				                CASE
+				                    WHEN ST.Region IS NULL
+				                      OR TRIM(ST.Region) = ''
+				                      OR UPPER(TRIM(ST.Region)) = 'UNKNOWN'
+				                    THEN COALESCE(
+				                            (SELECT TOP 1 TRIM(SP.Region)
+				                             FROM dbo.Salesperson SP
+				                             WHERE SP.SalespersonID = ST.SalespersonID),
+				                            'Unassigned'
+				                         )
+				                    ELSE TRIM(ST.Region)
+				                END                                        AS Region,
+				                TRIM(ST.SalesChannel)                      AS SalesChannel,
+				                ST.SalespersonID,
+				                ABS(ST.QuantitySold)                       AS QuantitySold,
+				                CASE
+				                    WHEN ST.DiscountPct < 0   THEN 0
+				                    WHEN ST.DiscountPct > 100 THEN 100
+				                    ELSE ST.DiscountPct
+				                END                                        AS DiscountPct
+				            FROM dbo.SalesTransactions ST
+				            WHERE ST.RowID          IS NOT NULL
+				              AND ST.TransactionID  IS NOT NULL
+				              AND ST.SaleDate       IS NOT NULL
+				              AND ST.SaleDate       <= CAST(GETDATE() AS DATE)
+				              AND ST.ProductID      IS NOT NULL
+				              AND ST.SalespersonID  IS NOT NULL AND TRIM(ST.SalespersonID) <> ''
+				              AND ST.SalesChannel   IS NOT NULL
+				              AND TRIM(ST.SalesChannel) IN ('Online', 'In-store')
+				              AND ST.QuantitySold   IS NOT NULL AND ST.QuantitySold > 0
+				              AND ST.DiscountPct    IS NOT NULL AND ST.DiscountPct >= 0
+				        "
+				    ])
+				in
+				    Source
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

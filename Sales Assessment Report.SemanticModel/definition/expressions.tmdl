@@ -1,0 +1,14 @@
+expression ServerName = "GRIM_PC\SQLEXPRESS" meta [IsParameterQuery=true, List={"GRIM_PC\SQLEXPRESS"}, DefaultValue="GRIM_PC\SQLEXPRESS", Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 9aa14302-6df1-4526-a8f7-2c6c471c3d8a
+
+	annotation PBI_ResultType = Text
+
+	annotation PBI_NavigationStepName = Navigation
+
+expression DatabaseName = "SalesAssessment" meta [IsParameterQuery=true, List={"SalesAssessment"}, DefaultValue="SalesAssessment", Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 09c1f0cb-1aea-4da8-b840-6780fa1994a9
+
+	annotation PBI_ResultType = Text
+
+	annotation PBI_NavigationStepName = Navigation
+

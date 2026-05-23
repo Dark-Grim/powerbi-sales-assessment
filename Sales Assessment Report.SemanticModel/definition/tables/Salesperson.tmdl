@@ -1,0 +1,70 @@
+table Salesperson
+	lineageTag: fea3f39c-4a45-4cfb-93ca-e700637ece80
+
+	column SalespersonID
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(10)
+		lineageTag: efa340bd-69f1-41c7-8013-74f0b2e5689d
+		summarizeBy: none
+		sourceColumn: SalespersonID
+
+		annotation SummarizationSetBy = Automatic
+
+	column SalespersonName
+		dataType: string
+		isNullable: false
+		sourceProviderType: nvarchar(100)
+		lineageTag: d7f2a418-8d67-41b2-968b-d930a10d6ec6
+		summarizeBy: none
+		sourceColumn: SalespersonName
+
+		annotation SummarizationSetBy = Automatic
+
+	column Region
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(10)
+		lineageTag: 498cd082-4af4-423c-a8fd-3cc815bbac48
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = Automatic
+
+	column SalesTarget
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: bigint
+		lineageTag: b0e95acf-9eec-4961-87be-f04eb4f0b74d
+		summarizeBy: none
+		sourceColumn: SalesTarget
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Salesperson = m
+		mode: directQuery
+		source =
+				let
+				    Source = Sql.Database(ServerName, DatabaseName, [
+				        Query = "
+				            SELECT
+				                SalespersonID,
+				                TRIM(SalespersonName)                      AS SalespersonName,
+				                TRIM(Region)                               AS Region,
+				                ABS(SalesTarget)                           AS SalesTarget
+				            FROM dbo.Salesperson
+				            WHERE SalespersonID   IS NOT NULL AND TRIM(SalespersonID)   <> ''
+				              AND SalespersonName IS NOT NULL AND TRIM(SalespersonName) <> ''
+				              AND Region          IS NOT NULL AND TRIM(Region)          <> ''
+				              AND Region          IN ('North', 'South', 'East', 'West')
+				              AND SalesTarget     IS NOT NULL AND SalesTarget >= 0
+				        "
+				    ])
+				in
+				    Source
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

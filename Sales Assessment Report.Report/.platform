@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "Sales Assessment Report"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "493a9915-232a-4465-8ca5-5db103af30ed"
+  }
+}

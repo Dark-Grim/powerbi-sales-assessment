@@ -1,0 +1,12 @@
+relationship 0d3f3c19-7211-4c37-be6c-749cd9e88ca5
+	fromColumn: SalesTransactions.ProductID
+	toColumn: Products.ProductID
+
+	annotation PBI_IsFromSource = FS
+
+relationship 086d0d2d-35af-4a4d-9fc6-635811bee72e
+	fromColumn: SalesTransactions.SalespersonID
+	toColumn: Salesperson.SalespersonID
+
+	annotation PBI_IsFromSource = FS
+
