@@ -1,0 +1,71 @@
+table Products
+	lineageTag: 2a02974b-d321-4b84-967f-3bd6223946b3
+
+	column ProductID
+		dataType: int64
+		isNullable: false
+		formatString: 0
+		sourceProviderType: int
+		lineageTag: 8f954bc3-12d2-4886-bc00-08890e19c7c9
+		summarizeBy: none
+		sourceColumn: ProductID
+
+		annotation SummarizationSetBy = Automatic
+
+	column ProductName
+		dataType: string
+		isNullable: false
+		sourceProviderType: nvarchar(100)
+		lineageTag: 6129c8a6-d0eb-405e-8765-9dda60709b98
+		summarizeBy: none
+		sourceColumn: ProductName
+
+		annotation SummarizationSetBy = Automatic
+
+	column Category
+		dataType: string
+		isNullable: false
+		sourceProviderType: varchar(20)
+		lineageTag: 1e0fd9a2-85e5-464c-93e0-3d7085d39584
+		summarizeBy: none
+		sourceColumn: Category
+
+		annotation SummarizationSetBy = Automatic
+
+	column Price
+		dataType: double
+		isNullable: false
+		sourceProviderType: decimal(10, 2)
+		lineageTag: 2d1a4122-b96e-4753-96ea-5d460b59fa14
+		summarizeBy: none
+		sourceColumn: Price
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition Products = m
+		mode: directQuery
+		source =
+				let
+				    Source = Sql.Database(ServerName, DatabaseName, [
+				        Query = "
+				            SELECT
+				                ProductID,
+				                TRIM(ProductName) AS ProductName,
+				                TRIM(Category) AS Category,
+				                ABS(Price) AS Price
+				            FROM dbo.Products
+				            WHERE ProductID IS NOT NULL
+				            AND ProductName IS NOT NULL AND TRIM(ProductName) <> ''
+				            AND Category IS NOT NULL AND TRIM(Category) <> ''
+				            AND Price IS NOT NULL AND Price > 0
+				        "
+				    ])
+				in
+				    Source
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+
