@@ -37,6 +37,91 @@ table SalesTransactions
 		displayFolder: Sales Metrics
 		lineageTag: 512f374d-2902-415a-9b58-8dc94f5564a9
 
+	/// Total Sales at Region level
+	measure 'Sales by Region' = CALCULATE([Total Sales], ALLEXCEPT(SalesTransactions, SalesTransactions[Region]))
+		formatString: #,##0.00
+		displayFolder: Drill-Down Metrics
+		lineageTag: 95bf85dc-cb25-41a0-af8c-d4b25e47345e
+
+	/// Total Sales at Product Category level
+	measure 'Sales by Category' = CALCULATE([Total Sales], ALLEXCEPT(SalesTransactions, SalesTransactions[Region], SalesTransactions[ProductCategory]))
+		formatString: #,##0.00
+		displayFolder: Drill-Down Metrics
+		lineageTag: 9e397d8a-909f-4b96-a418-914f33a2179e
+
+	/// Total Sales at Salesperson level within Region and Category
+	measure 'Sales by Salesperson' = CALCULATE([Total Sales], ALLEXCEPT(SalesTransactions, SalesTransactions[Region], SalesTransactions[ProductCategory], SalesTransactions[SalespersonID]))
+		formatString: #,##0.00
+		displayFolder: Drill-Down Metrics
+		lineageTag: 51683060-8ebc-4a27-95eb-e6c7b58b1d89
+
+	/// % contribution of current level to total sales
+	measure 'Sales % of Total' = DIVIDE([Total Sales], CALCULATE([Total Sales], ALL(SalesTransactions)), 0)
+		formatString: 0.00%
+		displayFolder: Drill-Down Metrics
+		lineageTag: 84924119-a17b-4795-a8d0-239132794821
+
+	/// % contribution of current selection to its parent Region total
+	measure 'Sales % of Region' = DIVIDE([Total Sales], CALCULATE([Total Sales], ALLEXCEPT(SalesTransactions, SalesTransactions[Region])), 0)
+		formatString: 0.00%
+		displayFolder: Drill-Down Metrics
+		lineageTag: cd178208-ee7c-48ad-95f2-ac397f483012
+
+	/// Total Sales Target filtered by region context via SalesTransactions relationship
+	measure 'Sales Target' =
+			CALCULATE(
+			    SUMX(Salesperson, Salesperson[SalesTarget]),
+			    TREATAS(
+			        VALUES(SalesTransactions[Region]),
+			        Salesperson[Region]
+			    )
+			)
+		formatString: #,##0.00
+		displayFolder: KPI Metrics
+		lineageTag: 72ba83ba-f572-450a-9a11-2393239f6a3d
+
+	/// Absolute variance: Total Sales minus Sales Target
+	measure 'Sales vs Target' = DIVIDE([Total Sales] - [Sales Target], 1, 0)
+		formatString: #,##0.00
+		displayFolder: KPI Metrics
+		lineageTag: 37ba1cb0-d976-4ddb-9dbb-74adb941c569
+
+	/// Variance % against target
+	measure 'Sales vs Target %' = DIVIDE([Total Sales] - [Sales Target], [Sales Target], 0)
+		formatString: +0.00%;-0.00%;0.00%
+		displayFolder: KPI Metrics
+		lineageTag: 16e43578-67dc-4983-ac9d-07be831bfb40
+
+	/// Achievement % of target
+	measure 'Target Achievement %' = DIVIDE([Total Sales], [Sales Target], 0)
+		formatString: 0.00%
+		displayFolder: KPI Metrics
+		lineageTag: 2ea0cb02-058f-488d-a51f-7f582f4bf6c6
+
+	/// KPI Status: 1 = Above Target, 0 = Within 10% below, -1 = Below Target by more than 10%
+	measure 'KPI Status' =
+			VAR Achievement = DIVIDE([Total Sales], [Sales Target], 0)
+			RETURN
+			    IF(Achievement >= 1, 1,
+			        IF(Achievement >= 0.9, 0, -1)
+			    )
+		formatString: 0
+		displayFolder: KPI Metrics
+		lineageTag: ef324ec5-0ae0-4a71-a0bf-0b7465d58c00
+
+	/// Returns hex color based on KPI Status for conditional formatting
+	measure 'KPI Color' =
+			SWITCH(
+			    [KPI Status],
+			    1,  "#27AE60",
+			    0,  "#F39C12",
+			    -1, "#E74C3C",
+			        "#6B7A99"
+			)
+		formatString: @
+		displayFolder: KPI Metrics
+		lineageTag: 2b9a953c-2cf7-4b17-816e-e44400605042
+
 	column RowID
 		dataType: int64
 		isNullable: false
@@ -144,6 +229,32 @@ table SalesTransactions
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
+	column SalespersonName
+		dataType: string
+		sourceProviderType: nvarchar(100)
+		lineageTag: c4667acb-0e95-4962-ade9-45b06473f456
+		summarizeBy: none
+		sourceColumn: SalespersonName
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Drill-down hierarchy: Region > Product Category > Salesperson
+	hierarchy 'Sales Drill-Down'
+		displayFolder: Hierarchies
+		lineageTag: af06d60a-5ee7-4604-bdbc-ca729225a255
+
+		level Region
+			lineageTag: caeb2c4c-6282-4b57-9f51-2470e3cbc17e
+			column: Region
+
+		level 'Product Category'
+			lineageTag: 30155c23-0198-465f-9c0f-917623dea55e
+			column: ProductCategory
+
+		level Salesperson
+			lineageTag: 81d1bf7e-9d5b-469e-bf6a-9c46005f9d3e
+			column: SalespersonName
+
 	partition SalesTransactions = m
 		mode: directQuery
 		source =
@@ -181,6 +292,7 @@ table SalesTransactions
 				                END                                        AS Region,
 				                TRIM(ST.SalesChannel)                      AS SalesChannel,
 				                ST.SalespersonID,
+				                TRIM(SP.SalespersonName)                   AS SalespersonName,
 				                ABS(ST.QuantitySold)                       AS QuantitySold,
 				                CASE
 				                    WHEN ST.DiscountPct < 0   THEN 0
@@ -188,6 +300,8 @@ table SalesTransactions
 				                    ELSE ST.DiscountPct
 				                END                                        AS DiscountPct
 				            FROM dbo.SalesTransactions ST
+				            LEFT JOIN dbo.Salesperson SP
+				                ON SP.SalespersonID = ST.SalespersonID
 				            WHERE ST.RowID          IS NOT NULL
 				              AND ST.TransactionID  IS NOT NULL
 				              AND ST.SaleDate       IS NOT NULL

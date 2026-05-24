@@ -83,8 +83,10 @@ This script will automatically:
 
 1. Open **`SalesReport.pbip`** in Power BI Desktop
 2. Go to **Home → Transform Data → Data Source Settings**
-3. Update the server to `localhost\SQLEXPRESS`
+3. Update the server to `localhost\SQLEXPRESS` and database to `SalesAssessment`
 4. Click **Close & Apply**
+
+> **Note:** The report uses two Power Query **parameters** (`ServerName` and `DatabaseName`) to manage the connection. Update these under **Home → Transform Data → Manage Parameters** if your server name differs.
 
 ---
 
@@ -112,15 +114,82 @@ Both relationships are **One-to-Many** with single cross-filter direction for op
 
 ---
 
+## Power Query Parameters
+
+The data source connection is managed via two parameters, making it easy to switch environments without editing each table query individually:
+
+| Parameter      | Default Value        | Purpose                  |
+| -------------- | -------------------- | ------------------------ |
+| `ServerName`   | `GRIM_PC\SQLEXPRESS` | SQL Server instance name |
+| `DatabaseName` | `SalesAssessment`    | Target database name     |
+
+To switch to a different server or database: **Home → Transform Data → Manage Parameters**
+
+---
+
+## Data Cleaning (SQL Layer)
+
+All cleaning is applied **inside the Power Query native SQL queries** — the source tables in SQL Server are left completely untouched. Each table query includes defensive SQL that handles current and future data quality issues automatically:
+
+### Products
+
+- Filters out null or blank `ProductID`, `ProductName`, `Category`
+- Excludes zero or negative prices (`Price > 0`)
+- Trims whitespace from all text columns
+
+### Salesperson
+
+- Filters out null or blank IDs, names, and regions
+- Validates `Region` against a fixed list: `('North', 'South', 'East', 'West')`
+- Excludes negative sales targets
+
+### SalesTransactions
+
+- Excludes future-dated transactions (`SaleDate <= GETDATE()`)
+- Auto-heals `'Unknown'` or blank `ProductCategory` by looking up from Products table (falls back to `'Uncategorized'`)
+- Auto-heals `'Unknown'` or blank `Region` by looking up from Salesperson table (falls back to `'Unassigned'`)
+- Validates `SalesChannel` against `('Online', 'In-store')`
+- Excludes zero or negative quantities
+- Clamps `DiscountPct` to valid range: values below 0 set to 0, values above 100 set to 100
+- Trims whitespace from all text columns
+
+---
+
 ## DAX Measures
 
-| Measure                 | Purpose                                     |
-| ----------------------- | ------------------------------------------- |
-| `Total Sales`           | SUMX of Quantity × Price via RELATED        |
-| `Total Discount Amount` | SUMX of Quantity × Price × Discount%        |
-| `Net Sales`             | Total Sales minus Total Discount Amount     |
-| `Total Sales Target`    | SUM of individual salesperson targets       |
-| `Sales vs Target %`     | DIVIDE of Total Sales by Total Sales Target |
+Measures are organised into three display folders:
+
+### Sales Metrics
+
+| Measure                 | Formula                                                                      | Purpose                                  |
+| ----------------------- | ---------------------------------------------------------------------------- | ---------------------------------------- |
+| `Total Sales`           | `SUMX(SalesTransactions, QuantitySold * RELATED(Price))`                     | Primary revenue metric (before discount) |
+| `Gross Sales`           | Same as Total Sales                                                          | Alternate label for gross revenue        |
+| `Total Discount Amount` | `SUMX(SalesTransactions, QuantitySold * RELATED(Price) * DiscountPct / 100)` | Total discount given                     |
+| `Net Sales`             | `Total Sales - Total Discount Amount`                                        | Revenue after discount                   |
+| `Total Quantity Sold`   | `SUM(QuantitySold)`                                                          | Total units sold                         |
+| `Avg Discount %`        | `AVERAGE(DiscountPct)`                                                       | Average discount rate                    |
+
+### Drill-Down Metrics
+
+| Measure                | Purpose                                       |
+| ---------------------- | --------------------------------------------- |
+| `Sales by Region`      | Total Sales scoped to Region level            |
+| `Sales by Category`    | Total Sales scoped to Region + Category level |
+| `Sales by Salesperson` | Total Sales scoped to all 3 drill levels      |
+| `Sales % of Total`     | Contribution % vs grand total                 |
+| `Sales % of Region`    | Contribution % vs parent region               |
+
+### KPI Metrics
+
+| Measure                | Purpose                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| `Sales Target`         | Target aggregated from Salesperson table, filtered by region context via `TREATAS`      |
+| `Sales vs Target`      | Absolute variance (Total Sales − Target)                                                |
+| `Sales vs Target %`    | Variance % against target                                                               |
+| `Target Achievement %` | Total Sales ÷ Sales Target                                                              |
+| `KPI Status`           | `1` = Above target, `0` = Within 10% below, `-1` = More than 10% below                  |
+| `KPI Color`            | Returns hex color string for conditional formatting (`#27AE60` / `#F39C12` / `#E74C3C`) |
 
 ---
 
@@ -149,18 +218,6 @@ This project is saved in **Power BI Project (.pbip)** format instead of .pbix be
 ### Data Model
 
 ![Data Model](screenshots/01_data_model.png)
-
-### Sales Overview Report
-
-![Basic Report](screenshots/02_basic_report.png)
-
-### Drill-Down Report
-
-![Drill-Down](screenshots/03_drilldown_report.png)
-
-### KPI Card
-
-![KPI Card](screenshots/04_kpi_card.png)
 
 ---
 
